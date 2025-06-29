@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Upload para Firebase</title>
+    <style>
+        /* Estilos (CSS) para uma aparência moderna e limpa */
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            height: 100vh; 
+            margin: 0; 
+            background-color: #f4f7f9;
+        }
+        .upload-container { 
+            background-color: white; 
+            padding: 40px; 
+            border-radius: 12px; 
+            box-shadow: 0 8px 30px rgba(0,0,0,0.1); 
+            text-align: center; 
+            width: 90%; 
+            max-width: 500px;
+        }
+        h1 { color: #333; margin-top: 0; }
+        p { color: #666; margin-bottom: 25px; }
+        .button-group { display: flex; justify-content: center; gap: 15px; margin-top: 20px; }
+        .button { 
+            display: inline-block; 
+            padding: 12px 25px; 
+            border: none; 
+            color: white; 
+            border-radius: 6px; 
+            cursor: pointer; 
+            font-weight: bold; 
+            transition: background-color 0.2s, opacity 0.2s;
+        }
+        .button-primary { background-color: #007bff; }
+        .button-primary:hover { background-color: #0056b3; }
+        .button-secondary { background-color: #28a745; }
+        .button-secondary:hover { background-color: #218838; }
+        .button:disabled { background-color: #6c757d; opacity: 0.6; cursor: not-allowed; }
+        input[type="file"] { display: none; }
+        #message-container { 
+            margin-top: 20px; 
+            padding: 12px; 
+            border-radius: 6px; 
+            font-weight: 500; 
+            min-height: 20px;
+        }
+        .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+    </style>
+</head>
+<body>
+
+    <div class="upload-container">
+        <h1>Upload para Firebase</h1>
+        <p>Selecione uma imagem ou vídeo com até 10MB.</p>
+        
+        <div class="button-group">
+            <label for="file-input" class="button button-primary">Escolher Arquivo</label>
+            <button id="submit-button" class="button button-secondary" disabled>Enviar para Firebase</button>
+        </div>
+        <input type="file" id="file-input">
+
+        <div id="message-container"></div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-storage-compat.js"></script>
+
+    <script>
+
+        const firebaseConfig = {
+            apiKey: "AIzaSy...",
+            authDomain: "seu-projeto.firebaseapp.com",
+            projectId: "seu-projeto",
+            storageBucket: "seu-projeto.appspot.com",
+            messagingSenderId: "1234567890",
+            appId: "1:1234567890:web:abcdef123456",
+            measurementId: ""
+        };
+
+
+        firebase.initializeApp(firebaseConfig);
+        const storage = firebase.storage();
+
+        const fileInput = document.getElementById('file-input');
+        const submitButton = document.getElementById('submit-button');
+        const messageContainer = document.getElementById('message-container');
+        let fileToUpload = null; // Variável para guardar o arquivo válido
+
+        // Escuta o evento de seleção de arquivo
+        fileInput.addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            
+            // Reseta o estado
+            submitButton.disabled = true;
+            fileToUpload = null;
+            displayMessage('', '');
+
+            if (!file) return;
+
+            const maxSizeInBytes = 10 * 1024 * 1024;
+            if (file.size > maxSizeInBytes) {
+                displayMessage(`Erro: Arquivo muito grande. Máximo 10 MB.`, 'error');
+                fileInput.value = '';
+                return;
+            }
+
+            const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp', 'video/mp4'];
+            if (!allowedMimeTypes.includes(file.type)) {
+                displayMessage(`Erro: Tipo de arquivo não suportado.`, 'error');
+                fileInput.value = '';
+                return;
+            }
+
+            displayMessage(`✅ Arquivo "${file.name}" pronto para o envio!`, 'success');
+            fileToUpload = file;
+            submitButton.disabled = false;
+        });
+
+        // Escuta o evento de clique no botão "Enviar"
+        submitButton.addEventListener('click', function() {
+            if (!fileToUpload) {
+                displayMessage('Erro: Nenhum arquivo válido selecionado.', 'error');
+                return;
+            }
+
+            submitButton.disabled = true;
+            fileInput.disabled = true;
+
+            // Caminho no Storage: `uploads/timestamp-nomeoriginal.ext`
+            const filePath = `uploads/${Date.now()}-${fileToUpload.name}`;
+            const storageRef = storage.ref(filePath);
+            
+            // Inicia o upload
+            const uploadTask = storageRef.put(fileToUpload);
+
+            // Escuta os eventos do upload
+            uploadTask.on('state_changed', 
+                (snapshot) => {
+                    const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                    displayMessage(`Enviando: ${Math.round(progress)}%`, 'success');
+                }, 
+                (error) => {
+                    console.error("Erro no upload:", error);
+                    displayMessage(`Erro no upload: ${error.message}`, 'error');
+                    submitButton.disabled = false;
+                    fileInput.disabled = false;
+                }, 
+                () => {
+                    displayMessage('🎉 Upload concluído! Sua Cloud Function irá processar o arquivo agora.', 'success');
+                    fileInput.value = ''; 
+                    setTimeout(() => {
+                        displayMessage('', '');
+                        submitButton.disabled = true;
+                        fileInput.disabled = false;
+                    }, 5000);
+                }
+            );
+        });
+
+        function displayMessage(message, type) {
+            messageContainer.textContent = message;
+            messageContainer.className = type;
+        }
+    </script>
+</body>
+</html>
