@@ -140,6 +140,7 @@ Siga estes passos para configurar e publicar o projeto do zero.
         storageBucket: "seu-projeto.appspot.com",
         messagingSenderId: "1234567890",
         appId: "1:1234567890:web:abcdef123456"
+        measurementId: ""
       };
       // ... resto do script
     </script>
